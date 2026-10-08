@@ -1,4 +1,4 @@
-ame: "scan-regen"
+name: "scan-regen"
 title: "Scan & Régénère — Lecteur / Générateur de codes-barres"
 type: "text/html"
 ---
@@ -30,6 +30,15 @@ type: "text/html"
   #torchBtn.on { background:#16a34a; }
   #torchBtn.off { background:#dc2626; }
   #torchBtn.na { background:#475569; background-image:linear-gradient(45deg,transparent 42%,#94a3b8 42%,#94a3b8 58%,transparent 58%); }
+  .switchRow { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .swLbl { font-size:.95rem; font-weight:600; }
+  .switch { position:relative; display:inline-block; width:54px; height:28px; flex:none; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider { position:absolute; cursor:pointer; inset:0; background:#475569; border-radius:28px; transition:.2s; }
+  .slider:before { content:""; position:absolute; height:22px; width:22px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+  .switch input:checked + .slider { background:#16a34a; }
+  .switch input:checked + .slider:before { transform:translateX(26px); }
+  .switch input.na + .slider { background:#334155; background-image:linear-gradient(45deg,transparent 42%,#94a3b8 42%,#94a3b8 58%,transparent 58%); }
   button.active { outline:3px solid #38bdf8; }
   video { width:100%; border-radius:12px; background:#000; display:block; }
   #result { display:none; }
@@ -66,16 +75,28 @@ type: "text/html"
   <div class="sub">Scanne un code illisible avec la caméra, il est régénéré en QR code ou code-barres propre. Fonctionne hors-ligne pour la génération.</div>
 
   <div class="card" id="scanCard">
+    <div class="switchRow">
+      <span class="swLbl">💡 Lampe torche ON/OFF</span>
+      <label class="switch"><input type="checkbox" id="torchSwitch" /><span class="slider"></span></label>
+      <span class="hint" id="torchLabel" style="margin-top:0">OFF</span>
+    </div>
     <video id="video" playsinline muted></video>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="startBtn">▶︎ Démarrer la caméra</button>
-      <button class="sec" id="modeBtn" style="width:auto;white-space:nowrap;margin-top:0"></button>
     </div>
+    <div class="switchRow" style="margin-top:8px">
+      <span class="swLbl">📸 Photo unique</span>
+      <label class="switch"><input type="checkbox" id="modeSwitch" checked /><span class="slider"></span></label>
+      <span class="hint" id="modeLabel" style="margin-top:0">ON</span>
+    </div>
+    <div class="hint" style="margin-top:0">ON = arrêt automatique après 1 code · OFF = scan à la volée</div>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-      <button class="sec" id="shotBtn" style="margin-top:0">📷 Prendre une photo</button>
+      <button class="sec" id="shotBtn" style="margin-top:0">📷 Photo — caméra intégrée (lampe + zoom)</button>
+      <button class="sec" id="appShotBtn" style="margin-top:0">📸 Photo — appareil photo du téléphone</button>
       <button class="sec" id="photoBtn" style="margin-top:0">🖼️ Scanner une photo enregistrée</button>
     </div>
     <input type="file" id="photoInput" accept="image/*" style="display:none" />
+    <input type="file" id="appShotInput" accept="image/*" capture="environment" style="display:none" />
     <select id="camSelect" style="display:none"></select>
     <div id="camTools" style="display:none;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
       <button class="sec" id="torchBtn" style="width:auto;white-space:nowrap;margin-top:0">💡 Lampe : éteinte</button>
@@ -165,8 +186,9 @@ type: "text/html"
   var stream = null, rafId = null, detector = null, running = false;
   var mode = 'qr', lastResult = null, lastVal = null, cooldown = 0;
   var hist = [];
-  var modeBtn = document.getElementById('modeBtn');
-  var scanMode = 'vollee'; /* 'vollee' = scan continu | 'photo' = arrêt auto après capture */
+  var modeSwitch = document.getElementById('modeSwitch');
+  var modeLabel = document.getElementById('modeLabel');
+  var scanMode = 'photo'; /* 'photo' = arrêt auto après capture (PAR DÉFAUT) | 'vollee' = scan continu */
   var LS_KEY = 'scanregen_state_v1';
 
   /* ===== SAUVEGARDE LOCALE (sur l'appareil uniquement) ===== */
@@ -190,13 +212,13 @@ type: "text/html"
       if (s.lastResult) lastResult = s.lastResult;
     } catch (e) {}
   }
-  function updateModeBtn() {
-    if (scanMode === 'photo') { modeBtn.textContent = '📸 Photo unique'; modeBtn.classList.add('active'); }
-    else { modeBtn.textContent = '⚡ À la volée'; modeBtn.classList.remove('active'); }
+  function updateModeUI() {
+    modeSwitch.checked = (scanMode === 'photo');
+    modeLabel.textContent = (scanMode === 'photo') ? 'ON' : 'OFF';
   }
-  modeBtn.addEventListener('click', function () {
-    scanMode = (scanMode === 'vollee') ? 'photo' : 'vollee';
-    updateModeBtn(); saveState();
+  modeSwitch.addEventListener('change', function () {
+    scanMode = modeSwitch.checked ? 'photo' : 'vollee';
+    updateModeUI(); saveState();
     statusEl.className = 'hint';
     statusEl.textContent = scanMode === 'photo'
       ? 'Mode photo unique : la caméra s\'arrêtera automatiquement après chaque code capturé.'
@@ -250,7 +272,7 @@ type: "text/html"
   };
   renderHistory();
   /* Restauration après fermeture/rechargement : rien n'est perdu par accident */
-  loadState(); updateModeBtn(); renderHistory();
+  loadState(); updateModeUI(); renderHistory();
   if (lastResult) {
     valEl.textContent = lastResult;
     editVal.value = lastResult;
@@ -343,6 +365,15 @@ type: "text/html"
     if (camTools) camTools.style.display = 'none';
     if (shutterBtn) shutterBtn.style.display = 'none';
     shotActive = false;
+    /* Si l'utilisateur veut toujours la lampe (interrupteur ON), on la relance sur le flux caché
+       — avec un petit délai, annulable si un nouveau scan démarre aussitôt. */
+    if (torchRelaunchTimer) { clearTimeout(torchRelaunchTimer); torchRelaunchTimer = null; }
+    if (torchWanted && !document.hidden) {
+      torchRelaunchTimer = setTimeout(function () {
+        torchRelaunchTimer = null;
+        if (torchWanted && !running) torchToggle(true);
+      }, 400);
+    }
   }
 
   /* ================= CHOIX DE LA CAMÉRA, LAMPE, ZOOM, PHOTO (v8-v10) ================= */
@@ -354,18 +385,91 @@ type: "text/html"
   var torchOn = false;
   var shotActive = false;
 
-  /* Éteint la lampe automatiquement (après lecture d'un code) */
-  function torchAutoOff() {
-    if (!torchOn) return;
-    if (stream && stream.getVideoTracks && stream.getVideoTracks().length > 0) {
-      var track = stream.getVideoTracks()[0];
-      track.applyConstraints({ advanced: [{ torch: false }] }).then(function () {
-        torchOn = false;
-        torchBtn.classList.remove('on');
-        torchBtn.classList.add('off');
-        torchBtn.textContent = '💡 Lampe : éteinte';
-      }).catch(function () {});
+  /* ===== LAMPE TORCHE GÉNÉRALE (v11) : interrupteur ON/OFF sur la page d'accueil =====
+     Fonctionne même sans scan en cours, grâce à un flux caméra caché. */
+  var torchSwitch = document.getElementById('torchSwitch');
+  var torchLabel = document.getElementById('torchLabel');
+  var torchWanted = false;   /* l'utilisateur veut la lampe allumée */
+  var torchStream = null;    /* flux caméra caché utilisé pour la lampe hors scan */
+  var torchRelaunchTimer = null;
+  var torchVideo = document.createElement('video');
+  torchVideo.setAttribute('playsinline', '');
+  torchVideo.muted = true;
+  torchVideo.style.display = 'none';
+  document.body.appendChild(torchVideo);
+
+  function stopTorchStream() {
+    if (torchStream) {
+      torchStream.getTracks().forEach(function (t) { t.stop(); });
+      torchStream = null;
+      torchVideo.srcObject = null;
     }
+  }
+  function setTorchUI(on, na) {
+    torchWanted = on;
+    torchSwitch.checked = on;
+    if (na) torchSwitch.classList.add('na'); else torchSwitch.classList.remove('na');
+    torchLabel.textContent = na ? 'indispo.' : (on ? 'ON' : 'OFF');
+  }
+  function syncTorchBtn() {
+    if (torchBtn.disabled) return;
+    torchBtn.classList.toggle('on', torchOn);
+    torchBtn.classList.toggle('off', !torchOn);
+    torchBtn.textContent = torchOn ? '💡 Lampe : allumée' : '💡 Lampe : éteinte';
+  }
+  async function torchToggle(on) {
+    var track = (running && stream && stream.getVideoTracks().length > 0)
+      ? stream.getVideoTracks()[0] : null;
+    if (!on) {
+      if (track && torchOn) track.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {});
+      torchOn = false;
+      setTorchUI(false, false);
+      syncTorchBtn();
+      if (!running) stopTorchStream();
+      return;
+    }
+    try {
+      if (!track) {
+        /* Pas de scan en cours : ouverture d'un flux caméra caché juste pour la lampe */
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('pas de caméra');
+        if (!torchStream) {
+          torchStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } }, audio: false
+          });
+          /* Un scan a été relancé entre-temps ou la lampe a été coupée : on abandonne proprement */
+          if (running || !torchWanted) { stopTorchStream(); return; }
+          torchVideo.srcObject = torchStream;
+          await torchVideo.play().catch(function () {});
+        }
+        if (!torchStream.getVideoTracks().length) throw new Error('pas de caméra');
+        track = torchStream.getVideoTracks()[0];
+      }
+      await track.applyConstraints({ advanced: [{ torch: true }] });
+      torchOn = true;
+      setTorchUI(true, false);
+      syncTorchBtn();
+    } catch (e) {
+      torchOn = false;
+      setTorchUI(false, true);
+      syncTorchBtn();
+      stopTorchStream();
+      statusEl.className = 'hint';
+      statusEl.textContent = '💡 Lampe torche non disponible sur cet appareil ou ce navigateur (essayez Chrome ou Opera sur smartphone).';
+    }
+  }
+  torchSwitch.addEventListener('change', function () { torchToggle(torchSwitch.checked); });
+
+  /* Éteint la lampe automatiquement (après lecture d'un code / régénération réussie) */
+  function torchAutoOff() {
+    if (!torchOn && !torchWanted) return;
+    var track = (running && stream && stream.getVideoTracks().length > 0)
+      ? stream.getVideoTracks()[0]
+      : (torchStream && torchStream.getVideoTracks().length > 0 ? torchStream.getVideoTracks()[0] : null);
+    if (track) track.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {});
+    torchOn = false;
+    setTorchUI(false, false);
+    syncTorchBtn();
+    if (!running) stopTorchStream();
   }
 
   /* Capture la frame caméra → photo → enregistrement + analyse (v10) */
@@ -382,8 +486,23 @@ type: "text/html"
   }
 
   /* Fermeture de l'application → éteint caméra et lampe */
-  window.addEventListener('pagehide', function () { if (running) stopScan(); });
-  document.addEventListener('visibilitychange', function () { if (document.hidden && running) stopScan(); });
+  function setTorchOffNow() {
+    if (torchRelaunchTimer) { clearTimeout(torchRelaunchTimer); torchRelaunchTimer = null; }
+    var track = (torchStream && torchStream.getVideoTracks().length > 0) ? torchStream.getVideoTracks()[0]
+      : ((running && stream && stream.getVideoTracks().length > 0) ? stream.getVideoTracks()[0] : null);
+    if (track && torchOn) track.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {});
+    torchOn = false;
+    torchWanted = false;
+    torchSwitch.checked = false;
+    torchSwitch.classList.remove('na');
+    torchLabel.textContent = 'OFF';
+    syncTorchBtn();
+    stopTorchStream();
+  }
+  window.addEventListener('pagehide', function () { torchWanted = false; if (running) stopScan(); setTorchOffNow(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { torchWanted = false; if (running) stopScan(); setTorchOffNow(); }
+  });
 
   function refreshCamList() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
@@ -428,20 +547,7 @@ type: "text/html"
       torchBtn.classList.remove('on', 'na');
       torchBtn.classList.add('off');
       torchBtn.textContent = '💡 Lampe : éteinte';
-      torchBtn.onclick = function () {
-        torchOn = !torchOn;
-        track.applyConstraints({ advanced: [{ torch: torchOn }] }).then(function () {
-          torchBtn.classList.toggle('on', torchOn);
-          torchBtn.classList.toggle('off', !torchOn);
-          torchBtn.textContent = torchOn ? '💡 Lampe : allumée' : '💡 Lampe : éteinte';
-        }).catch(function () {
-          torchOn = false;
-          torchBtn.disabled = true;
-          torchBtn.classList.remove('on', 'off');
-          torchBtn.classList.add('na');
-          torchBtn.textContent = '💡 Lampe indisponible';
-        });
-      };
+      torchBtn.onclick = function () { torchToggle(!torchOn); };
     } else {
       torchBtn.disabled = true;
       torchBtn.classList.remove('on', 'off');
@@ -474,6 +580,8 @@ type: "text/html"
       return;
     }
     try {
+      if (torchRelaunchTimer) { clearTimeout(torchRelaunchTimer); torchRelaunchTimer = null; }
+      stopTorchStream(); /* libère la caméra cachée de la lampe avant d'ouvrir le flux de scan */
       var camId = null;
       try { camId = localStorage.getItem('scanregen_cam') || null; } catch (e) {}
       var vcons = { width: { ideal: 1920 }, height: { ideal: 1080 } };
@@ -491,6 +599,7 @@ type: "text/html"
       statusEl.textContent = 'Visez le code-barres, la détection est automatique.';
       setupCamTools();
       refreshCamList();
+      if (torchWanted) torchToggle(true); /* la lampe suivait l'interrupteur : elle suit maintenant le flux de scan */
       if (shotActive) {
         shutterBtn.style.display = 'block';
         statusEl.textContent = 'Visez le code, réglez la lampe 💡 et le zoom 🔍, puis appuyez sur « 📸 Prendre la photo ».';
@@ -988,6 +1097,13 @@ type: "text/html"
   shotBtn.addEventListener('click', function () {
     if (running) stopScan();
     startScan(true);
+  });
+  /* 📸 Appareil photo du téléphone : ouvre l'appli Appareil photo, enregistre la photo puis l'analyse */
+  var appShotBtn = document.getElementById('appShotBtn');
+  var appShotInput = document.getElementById('appShotInput');
+  appShotBtn.addEventListener('click', function () { appShotInput.value = ''; appShotInput.click(); });
+  appShotInput.addEventListener('change', function () {
+    handlePhotoFile(appShotInput.files && appShotInput.files[0], true);
   });
   shutterBtn.addEventListener('click', captureShot);
 
