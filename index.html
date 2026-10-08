@@ -26,6 +26,7 @@ type: "text/html"
   .card { background:#1e293b; border-radius:14px; padding:16px; margin-bottom:14px; }
   button { background:#2563eb; color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:1rem; font-weight:600; cursor:pointer; width:100%; }
   button.sec { background:#334155; margin-top:8px; }
+  button:disabled { opacity:.55; }
   button.active { outline:3px solid #38bdf8; }
   video { width:100%; border-radius:12px; background:#000; display:block; }
   #result { display:none; }
@@ -79,6 +80,8 @@ type: "text/html"
       <span class="hint" style="margin-top:0;white-space:nowrap">🔍 Zoom</span>
       <input type="range" id="zoomRange" min="1" max="1" step="0.1" value="1" style="flex:1;accent-color:#2563eb" />
     </div>
+    <button class="sec" id="savePhotoBtn" style="display:none">💾 Enregistrer cette photo dans l'appareil</button>
+    <div id="saveStatus" class="hint" style="display:none"></div>
     <canvas id="zxCanvas" style="display:none"></canvas>
     <div id="scanStatus" class="hint">Visez le code-barres, la détection est automatique.</div>
     <div id="libStatus" class="hint"></div>
@@ -373,16 +376,24 @@ type: "text/html"
     var hasZoom = !!(caps.zoom && caps.zoom.max > caps.zoom.min);
     if (hasTorch) {
       torchOn = false;
-      torchBtn.style.display = '';
+      torchBtn.disabled = false;
       torchBtn.textContent = '💡 Lampe : éteinte';
       torchBtn.onclick = function () {
         torchOn = !torchOn;
         track.applyConstraints({ advanced: [{ torch: torchOn }] }).then(function () {
           torchBtn.textContent = torchOn ? '💡 Lampe : allumée' : '💡 Lampe : éteinte';
-        }).catch(function () {});
+        }).catch(function () {
+          torchBtn.disabled = true;
+          torchBtn.textContent = '💡 Lampe indisponible sur cet appareil';
+        });
       };
-    } else { torchBtn.style.display = 'none'; torchBtn.onclick = null; }
+    } else {
+      torchBtn.disabled = true;
+      torchBtn.textContent = '💡 Lampe indisponible sur cet appareil';
+      torchBtn.onclick = null;
+    }
     if (hasZoom) {
+      zoomRange.style.display = '';
       zoomRange.min = caps.zoom.min;
       zoomRange.max = caps.zoom.max;
       zoomRange.step = (caps.zoom.step && caps.zoom.step > 0) ? caps.zoom.step : 0.1;
@@ -390,8 +401,11 @@ type: "text/html"
       zoomRange.oninput = function () {
         track.applyConstraints({ advanced: [{ zoom: parseFloat(zoomRange.value) }] }).catch(function () {});
       };
-    } else { zoomRange.oninput = null; }
-    camTools.style.display = (hasTorch || hasZoom) ? 'flex' : 'none';
+    } else {
+      zoomRange.style.display = 'none';
+      zoomRange.oninput = null;
+    }
+    camTools.style.display = 'flex';
   }
 
   async function startScan() {
@@ -909,8 +923,63 @@ type: "text/html"
   var shotBtn = document.getElementById('shotBtn');
   var shotInput = document.getElementById('shotInput');
   shotBtn.addEventListener('click', function () { shotInput.value = ''; shotInput.click(); });
-  function handlePhotoFile(f) {
+
+  /* ===== ENREGISTREMENT DES PHOTOS (v9) ===== */
+  var savePhotoBtn = document.getElementById('savePhotoBtn');
+  var saveStatusEl = document.getElementById('saveStatus');
+  var lastPhoto = null;
+
+  function photoName(f) {
+    var d = new Date();
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    var ext = (f.type === 'image/png') ? '.png' : ((f.type === 'image/webp') ? '.webp' : '.jpg');
+    return 'photo-scan-regen-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + ext;
+  }
+
+  function showSaveMsg(msg) {
+    saveStatusEl.style.display = msg ? 'block' : 'none';
+    saveStatusEl.textContent = msg || '';
+    saveStatusEl.className = 'hint';
+  }
+
+  function downloadBlob(blob, fname) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); URL.revokeObjectURL(a.href); }, 5000);
+    return '💾 Photo enregistrée dans le dossier « Téléchargements » de l\u2019appareil.';
+  }
+
+  async function savePhotoToDevice(f) {
     if (!f) return;
+    var fname = photoName(f);
+    if (window.showSaveFilePicker) {
+      try {
+        var types = {};
+        if (f.type) types[f.type] = (f.type === 'image/png') ? ['.png'] : ['.jpg', '.jpeg'];
+        var handle = await window.showSaveFilePicker({ suggestedName: fname, types: [{ description: 'Photo', accept: types }] });
+        var w = await handle.createWritable();
+        await w.write(f);
+        await w.close();
+        showSaveMsg('💾 Photo enregistrée' + (handle && handle.name ? ' : ' + handle.name : ' dans le dossier que vous avez choisi.'));
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') { showSaveMsg('❌ Enregistrement annulé.'); return; }
+      }
+    }
+    showSaveMsg(downloadBlob(f, fname));
+  }
+
+  savePhotoBtn.addEventListener('click', function () { if (lastPhoto) savePhotoToDevice(lastPhoto); });
+
+  function handlePhotoFile(f, fromShot) {
+    if (!f) return;
+    lastPhoto = f;
+    savePhotoBtn.style.display = 'block';
+    showSaveMsg('');
+    if (fromShot) savePhotoToDevice(f);
     statusEl.className = 'hint';
     statusEl.textContent = 'Analyse de la photo…';
     var url = URL.createObjectURL(f);
@@ -946,8 +1015,8 @@ type: "text/html"
     };
     img.src = url;
   }
-  photoInput.addEventListener('change', function () { handlePhotoFile(photoInput.files && photoInput.files[0]); });
-  shotInput.addEventListener('change', function () { handlePhotoFile(shotInput.files && shotInput.files[0]); });
+  photoInput.addEventListener('change', function () { handlePhotoFile(photoInput.files && photoInput.files[0], false); });
+  shotInput.addEventListener('change', function () { handlePhotoFile(shotInput.files && shotInput.files[0], true); });
 
   tabQr.addEventListener('click', function () { mode = 'qr'; tabQr.classList.add('active'); tabBc.classList.remove('active'); renderOutput(); saveState(); });
   tabBc.addEventListener('click', function () { mode = 'bc'; tabBc.classList.add('active'); tabQr.classList.remove('active'); renderOutput(); saveState(); });
