@@ -27,6 +27,9 @@ type: "text/html"
   button { background:#2563eb; color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:1rem; font-weight:600; cursor:pointer; width:100%; }
   button.sec { background:#334155; margin-top:8px; }
   button:disabled { opacity:.55; }
+  #torchBtn.on { background:#16a34a; }
+  #torchBtn.off { background:#dc2626; }
+  #torchBtn.na { background:#475569; background-image:linear-gradient(45deg,transparent 42%,#94a3b8 42%,#94a3b8 58%,transparent 58%); }
   button.active { outline:3px solid #38bdf8; }
   video { width:100%; border-radius:12px; background:#000; display:block; }
   #result { display:none; }
@@ -69,17 +72,17 @@ type: "text/html"
       <button class="sec" id="modeBtn" style="width:auto;white-space:nowrap;margin-top:0"></button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-      <button class="sec" id="photoBtn" style="margin-top:0">🖼️ Scanner une photo enregistrée</button>
       <button class="sec" id="shotBtn" style="margin-top:0">📷 Prendre une photo</button>
+      <button class="sec" id="photoBtn" style="margin-top:0">🖼️ Scanner une photo enregistrée</button>
     </div>
     <input type="file" id="photoInput" accept="image/*" style="display:none" />
-    <input type="file" id="shotInput" accept="image/*" capture="environment" style="display:none" />
     <select id="camSelect" style="display:none"></select>
     <div id="camTools" style="display:none;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
       <button class="sec" id="torchBtn" style="width:auto;white-space:nowrap;margin-top:0">💡 Lampe : éteinte</button>
       <span class="hint" style="margin-top:0;white-space:nowrap">🔍 Zoom</span>
       <input type="range" id="zoomRange" min="1" max="1" step="0.1" value="1" style="flex:1;accent-color:#2563eb" />
     </div>
+    <button class="sec" id="shutterBtn" style="display:none">📸 Prendre la photo</button>
     <button class="sec" id="savePhotoBtn" style="display:none">💾 Enregistrer cette photo dans l'appareil</button>
     <div id="saveStatus" class="hint" style="display:none"></div>
     <canvas id="zxCanvas" style="display:none"></canvas>
@@ -304,12 +307,12 @@ type: "text/html"
     return { text: r.getText(), format: fmtName(r.getBarcodeFormat()) };
   }
   /* Décode une image/video dessinée dans un canvas — API 0.21 : MultiFormatReader + LuminanceSource */
-  function zxDecodeElement(el) {
+  function zxDecodeElement(el, maxSide) {
     if (!window.ZXing || !getReader()) return null;
     var w = el.videoWidth || el.naturalWidth || el.width;
     var h = el.videoHeight || el.naturalHeight || el.height;
     if (!w || !h) return null;
-    var scale = Math.min(1, 1200 / Math.max(w, h));
+    var scale = Math.min(1, (maxSide || 1200) / Math.max(w, h));
     var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
     var c = getZxCanvas(); c.width = cw; c.height = ch;
     var ctx = c.getContext('2d', { willReadFrequently: true });
@@ -317,6 +320,16 @@ type: "text/html"
     var ls = new ZXing.HTMLCanvasElementLuminanceSource(c);
     try { return zxDecodeLs(ls); } catch (e1) {}
     try { return zxDecodeLs(ls.rotateCounterClockwise()); } catch (e2) {}
+    return null;
+  }
+
+  /* Décode une photo en testant plusieurs résolutions (v10) */
+  function zxDecodePhoto(img) {
+    var sizes = [1400, 1000, 700];
+    for (var i = 0; i < sizes.length; i++) {
+      var r = zxDecodeElement(img, sizes[i]);
+      if (r) return r;
+    }
     return null;
   }
 
@@ -328,14 +341,49 @@ type: "text/html"
     video.srcObject = null;
     startBtn.textContent = '▶︎ Démarrer la caméra';
     if (camTools) camTools.style.display = 'none';
+    if (shutterBtn) shutterBtn.style.display = 'none';
+    shotActive = false;
   }
 
-  /* ================= CHOIX DE LA CAMÉRA, LAMPE, ZOOM (v8) ================= */
+  /* ================= CHOIX DE LA CAMÉRA, LAMPE, ZOOM, PHOTO (v8-v10) ================= */
   var camSelect = document.getElementById('camSelect');
   var torchBtn = document.getElementById('torchBtn');
   var zoomRange = document.getElementById('zoomRange');
   var camTools = document.getElementById('camTools');
+  var shutterBtn = document.getElementById('shutterBtn');
   var torchOn = false;
+  var shotActive = false;
+
+  /* Éteint la lampe automatiquement (après lecture d'un code) */
+  function torchAutoOff() {
+    if (!torchOn) return;
+    if (stream && stream.getVideoTracks && stream.getVideoTracks().length > 0) {
+      var track = stream.getVideoTracks()[0];
+      track.applyConstraints({ advanced: [{ torch: false }] }).then(function () {
+        torchOn = false;
+        torchBtn.classList.remove('on');
+        torchBtn.classList.add('off');
+        torchBtn.textContent = '💡 Lampe : éteinte';
+      }).catch(function () {});
+    }
+  }
+
+  /* Capture la frame caméra → photo → enregistrement + analyse (v10) */
+  function captureShot() {
+    if (!running || !video.videoWidth) return;
+    var c = document.createElement('canvas');
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0);
+    c.toBlob(function (blob) {
+      var f = new File([blob], photoName(blob), { type: blob.type || 'image/jpeg' });
+      stopScan();
+      handlePhotoFile(f, true);
+    }, 'image/jpeg', 0.92);
+  }
+
+  /* Fermeture de l'application → éteint caméra et lampe */
+  window.addEventListener('pagehide', function () { if (running) stopScan(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && running) stopScan(); });
 
   function refreshCamList() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
@@ -377,19 +425,28 @@ type: "text/html"
     if (hasTorch) {
       torchOn = false;
       torchBtn.disabled = false;
+      torchBtn.classList.remove('on', 'na');
+      torchBtn.classList.add('off');
       torchBtn.textContent = '💡 Lampe : éteinte';
       torchBtn.onclick = function () {
         torchOn = !torchOn;
         track.applyConstraints({ advanced: [{ torch: torchOn }] }).then(function () {
+          torchBtn.classList.toggle('on', torchOn);
+          torchBtn.classList.toggle('off', !torchOn);
           torchBtn.textContent = torchOn ? '💡 Lampe : allumée' : '💡 Lampe : éteinte';
         }).catch(function () {
+          torchOn = false;
           torchBtn.disabled = true;
-          torchBtn.textContent = '💡 Lampe indisponible sur cet appareil';
+          torchBtn.classList.remove('on', 'off');
+          torchBtn.classList.add('na');
+          torchBtn.textContent = '💡 Lampe indisponible';
         });
       };
     } else {
       torchBtn.disabled = true;
-      torchBtn.textContent = '💡 Lampe indisponible sur cet appareil';
+      torchBtn.classList.remove('on', 'off');
+      torchBtn.classList.add('na');
+      torchBtn.textContent = '💡 Lampe indisponible';
       torchBtn.onclick = null;
     }
     if (hasZoom) {
@@ -408,8 +465,9 @@ type: "text/html"
     camTools.style.display = 'flex';
   }
 
-  async function startScan() {
+  async function startScan(shot) {
     if (running) { stopScan(); return; }
+    shotActive = !!shot;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       statusEl.textContent = 'Caméra indisponible ici : utilisez « Scanner une photo enregistrée » ou hébergez la page en HTTPS.';
       statusEl.className = 'hint err';
@@ -433,13 +491,18 @@ type: "text/html"
       statusEl.textContent = 'Visez le code-barres, la détection est automatique.';
       setupCamTools();
       refreshCamList();
-      var bd = getDetector();
-      if (bd) tick();
-      else if (window.ZXing) zxTick();
-      else {
-        statusEl.textContent = 'Moteur de lecture non chargé. Rechargez la page avec Internet, ou utilisez « Scanner une photo enregistrée ».';
-        statusEl.className = 'hint err';
-        stopScan();
+      if (shotActive) {
+        shutterBtn.style.display = 'block';
+        statusEl.textContent = 'Visez le code, réglez la lampe 💡 et le zoom 🔍, puis appuyez sur « 📸 Prendre la photo ».';
+      } else {
+        var bd = getDetector();
+        if (bd) tick();
+        else if (window.ZXing) zxTick();
+        else {
+          statusEl.textContent = 'Moteur de lecture non chargé. Rechargez la page avec Internet, ou utilisez « Scanner une photo enregistrée ».';
+          statusEl.className = 'hint err';
+          stopScan();
+        }
       }
     } catch (e) {
       statusEl.textContent = 'Accès caméra refusé ou indisponible : ' + (e && e.message ? e.message : e) + ' — utilisez « Scanner une photo enregistrée ».';
@@ -478,6 +541,7 @@ type: "text/html"
     }
     saveHistory(value, format);
     openResult(value, format);
+    torchAutoOff();
   }
 
   /* ================= RÉSULTAT / AFFICHAGE ================= */
@@ -921,8 +985,11 @@ type: "text/html"
   startBtn.addEventListener('click', startScan);
   photoBtn.addEventListener('click', function () { photoInput.value = ''; photoInput.click(); });
   var shotBtn = document.getElementById('shotBtn');
-  var shotInput = document.getElementById('shotInput');
-  shotBtn.addEventListener('click', function () { shotInput.value = ''; shotInput.click(); });
+  shotBtn.addEventListener('click', function () {
+    if (running) stopScan();
+    startScan(true);
+  });
+  shutterBtn.addEventListener('click', captureShot);
 
   /* ===== ENREGISTREMENT DES PHOTOS (v9) ===== */
   var savePhotoBtn = document.getElementById('savePhotoBtn');
@@ -1001,9 +1068,9 @@ type: "text/html"
           } else finish(false, 'Aucun code détecté sur cette photo. Rapprochez-vous, assurez-vous que le code est net et bien éclairé.');
         }).catch(function () { finish(false, 'Analyse impossible. Réessayez.'); });
       } else if (window.ZXing) {
-        var r = zxDecodeElement(img);
+        var r = zxDecodePhoto(img);
         if (r) { finish(true, 'Code trouvé ✓'); onDetected(r.text, r.format); }
-        else finish(false, 'Aucun code détecté sur cette photo. Rapprochez-vous, assurez-vous que le code est net et bien éclairé.');
+        else finish(false, 'Aucun code détecté sur cette photo. Refaites-la avec « 📷 Prendre une photo » en zoomant 🔍 sur le code, ou rapprochez-vous pour qu\u2019il soit net et bien éclairé.');
       } else {
         finish(false, 'Moteur de lecture non chargé. Rechargez la page avec Internet.');
       }
@@ -1016,7 +1083,6 @@ type: "text/html"
     img.src = url;
   }
   photoInput.addEventListener('change', function () { handlePhotoFile(photoInput.files && photoInput.files[0], false); });
-  shotInput.addEventListener('change', function () { handlePhotoFile(shotInput.files && shotInput.files[0], true); });
 
   tabQr.addEventListener('click', function () { mode = 'qr'; tabQr.classList.add('active'); tabBc.classList.remove('active'); renderOutput(); saveState(); });
   tabBc.addEventListener('click', function () { mode = 'bc'; tabBc.classList.add('active'); tabQr.classList.remove('active'); renderOutput(); saveState(); });
