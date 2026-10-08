@@ -26,24 +26,17 @@ type: "text/html"
   .card { background:#1e293b; border-radius:14px; padding:16px; margin-bottom:14px; }
   button { background:#2563eb; color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:1rem; font-weight:600; cursor:pointer; width:100%; }
   button.sec { background:#334155; margin-top:8px; }
-  button:disabled { opacity:.55; }
-  #torchBtn.on { background:#16a34a; }
-  #torchBtn.off { background:#dc2626; }
-  #torchBtn.na { background:#475569; background-image:linear-gradient(45deg,transparent 42%,#94a3b8 42%,#94a3b8 58%,transparent 58%); }
-  .switchRow { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
-  .swLbl { font-size:.95rem; font-weight:600; }
+  button.active { outline:3px solid #38bdf8; }
+  .switchRow { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:10px; flex-wrap:wrap; }
+  .swLbl { font-size:.9rem; color:#94a3b8; }
+  #lblPhoto.actif { color:#4ade80; font-weight:700; }
+  #lblVollee.actif { color:#f87171; font-weight:700; }
   .switch { position:relative; display:inline-block; width:54px; height:28px; flex:none; }
   .switch input { opacity:0; width:0; height:0; }
-  .slider { position:absolute; cursor:pointer; inset:0; background:#475569; border-radius:28px; transition:.2s; }
+  .slider { position:absolute; cursor:pointer; inset:0; background:#dc2626; border-radius:28px; transition:.2s; }
   .slider:before { content:""; position:absolute; height:22px; width:22px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
   .switch input:checked + .slider { background:#16a34a; }
   .switch input:checked + .slider:before { transform:translateX(26px); }
-  .switch input:not(:checked) + .slider { background:#475569; }
-  .switch.swMode input:not(:checked) + .slider, .switch.swCam input:not(:checked) + .slider { background:#dc2626; }
-  .switch input.na + .slider { background:#334155; background-image:linear-gradient(45deg,transparent 42%,#94a3b8 42%,#94a3b8 58%,transparent 58%); }
-  .green { color:#4ade80; }
-  .red { color:#f87171; }
-  button.active { outline:3px solid #38bdf8; }
   video { width:100%; border-radius:12px; background:#000; display:block; }
   #result { display:none; }
   input[type=text] { width:100%; padding:12px; border-radius:10px; border:1px solid #475569; background:#0f172a; color:#e2e8f0; font-size:1.1rem; letter-spacing:1px; }
@@ -79,39 +72,17 @@ type: "text/html"
   <div class="sub">Scanne un code illisible avec la caméra, il est régénéré en QR code ou code-barres propre. Fonctionne hors-ligne pour la génération.</div>
 
   <div class="card" id="scanCard">
-    <div class="switchRow">
-      <span class="swLbl">💡 Lampe torche</span>
-      <label class="switch"><input type="checkbox" id="torchSwitch" /><span class="slider"></span></label>
-      <span class="hint" id="torchLabel" style="margin-top:0;font-weight:700">OFF</span>
-    </div>
     <video id="video" playsinline muted></video>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="startBtn">▶︎ Démarrer la caméra</button>
     </div>
-    <div class="switchRow" style="margin-top:8px">
-      <span class="swLbl">📸 Mode de scan</span>
-      <label class="switch swMode"><input type="checkbox" id="modeSwitch" checked /><span class="slider"></span></label>
-      <span class="hint green" id="modeLabel" style="margin-top:0;font-weight:700">Photo unique</span>
+    <div class="switchRow">
+      <span class="swLbl" id="lblPhoto">📸 Photo unique</span>
+      <label class="switch"><input type="checkbox" id="modeSwitch" checked /><span class="slider"></span></label>
+      <span class="swLbl" id="lblVollee">⚡ Scan à la volée</span>
     </div>
-    <div class="hint" style="margin-top:0">Photo unique = arrêt automatique après 1 code · À la volée = scans enchaînés</div>
-    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-      <button class="sec" id="shotBtn" style="margin-top:0;flex:1;min-width:230px">📸 Prendre une photo à enregistrer</button>
-      <label class="switch swCam"><input type="checkbox" id="camModeSwitch" checked /><span class="slider"></span></label>
-      <span class="hint green" id="camModeLabel" style="margin-top:0;font-weight:700;white-space:nowrap">Appareil photo</span>
-    </div>
-    <div class="hint" style="margin-top:0">Appareil photo (vert) = appli photo du téléphone · Caméra (rouge) = caméra intégrée avec lampe 💡 et zoom 🔍</div>
-    <button class="sec" id="photoBtn" style="margin-top:8px">🖼️ Scanner une photo enregistrée</button>
-    <input type="file" id="photoInput" accept="image/*" style="display:none" />
-    <input type="file" id="appShotInput" accept="image/*" capture="environment" style="display:none" />
-    <select id="camSelect" style="display:none"></select>
-    <div id="camTools" style="display:none;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-      <button class="sec" id="torchBtn" style="width:auto;white-space:nowrap;margin-top:0">💡 Lampe : éteinte</button>
-      <span class="hint" style="margin-top:0;white-space:nowrap">🔍 Zoom</span>
-      <input type="range" id="zoomRange" min="1" max="1" step="0.1" value="1" style="flex:1;accent-color:#2563eb" />
-    </div>
-    <button class="sec" id="shutterBtn" style="display:none">📸 Prendre la photo</button>
-    <button class="sec" id="savePhotoBtn" style="display:none">💾 Enregistrer cette photo dans l'appareil</button>
-    <div id="saveStatus" class="hint" style="display:none"></div>
+    <button class="sec" id="photoBtn">🖼️ Scanner depuis une photo</button>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" />
     <canvas id="zxCanvas" style="display:none"></canvas>
     <div id="scanStatus" class="hint">Visez le code-barres, la détection est automatique.</div>
     <div id="libStatus" class="hint"></div>
@@ -193,9 +164,9 @@ type: "text/html"
   var mode = 'qr', lastResult = null, lastVal = null, cooldown = 0;
   var hist = [];
   var modeSwitch = document.getElementById('modeSwitch');
-  var modeLabel = document.getElementById('modeLabel');
+  var lblPhoto = document.getElementById('lblPhoto');
+  var lblVollee = document.getElementById('lblVollee');
   var scanMode = 'photo'; /* 'photo' = arrêt auto après capture (PAR DÉFAUT) | 'vollee' = scan continu */
-  var shotMode = 'app';   /* 'app' = appareil photo du téléphone | 'cam' = caméra intégrée */
   var LS_KEY = 'scanregen_state_v1';
 
   /* ===== SAUVEGARDE LOCALE (sur l'appareil uniquement) ===== */
@@ -203,7 +174,7 @@ type: "text/html"
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({
         lastResult: lastResult, mode: mode, bc: bcFormat.value,
-        hist: hist.slice(0, 30), scanMode: scanMode, shotMode: shotMode
+        hist: hist.slice(0, 30), scanMode: scanMode
       }));
     } catch (e) {}
   }
@@ -212,7 +183,6 @@ type: "text/html"
       var s = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
       if (!s) return;
       if (s.scanMode === 'photo' || s.scanMode === 'vollee') scanMode = s.scanMode;
-      if (s.shotMode === 'app' || s.shotMode === 'cam') shotMode = s.shotMode;
       if (Array.isArray(s.hist)) hist = s.hist;
       if (s.bc) for (var i = 0; i < bcFormat.options.length; i++)
         if (bcFormat.options[i].value === s.bc) { bcFormat.selectedIndex = i; break; }
@@ -222,32 +192,16 @@ type: "text/html"
   }
   function updateModeUI() {
     modeSwitch.checked = (scanMode === 'photo');
-    modeLabel.textContent = (scanMode === 'photo') ? 'Photo unique' : 'À la volée';
-    modeLabel.className = 'hint ' + (scanMode === 'photo' ? 'green' : 'red');
+    lblPhoto.className = 'swLbl' + (scanMode === 'photo' ? ' actif' : '');
+    lblVollee.className = 'swLbl' + (scanMode === 'vollee' ? ' actif' : '');
   }
   modeSwitch.addEventListener('change', function () {
     scanMode = modeSwitch.checked ? 'photo' : 'vollee';
     updateModeUI(); saveState();
     statusEl.className = 'hint';
     statusEl.textContent = scanMode === 'photo'
-      ? 'Mode photo unique : la caméra s\'arrêtera automatiquement après chaque code capturé.'
-      : 'Mode à la volée : la caméra continue et enchaîne les scans automatiquement.';
-  });
-  /* Curseur « Appareil photo / Caméra » de la touche « Prendre une photo à enregistrer » */
-  var camModeSwitch = document.getElementById('camModeSwitch');
-  var camModeLabel = document.getElementById('camModeLabel');
-  function updateCamModeUI() {
-    camModeSwitch.checked = (shotMode === 'app');
-    camModeLabel.textContent = (shotMode === 'app') ? 'Appareil photo' : 'Caméra';
-    camModeLabel.className = 'hint ' + (shotMode === 'app' ? 'green' : 'red');
-  }
-  camModeSwitch.addEventListener('change', function () {
-    shotMode = camModeSwitch.checked ? 'app' : 'cam';
-    updateCamModeUI(); saveState();
-    statusEl.className = 'hint';
-    statusEl.textContent = shotMode === 'app'
-      ? 'Prise de vue : l\'appli Appareil photo du téléphone s\'ouvrira (photo enregistrée automatiquement).'
-      : 'Prise de vue : la caméra intégrée s\'ouvrira, avec lampe 💡 et zoom 🔍 disponibles.';
+      ? 'Mode photo unique : la caméra s' + apos + 'arrêtera automatiquement après chaque code capturé.'
+      : 'Mode scan à la volée : la caméra continue et enchaîne les scans automatiquement.';
   });
 
   function updateLibStatus() {
@@ -297,7 +251,7 @@ type: "text/html"
   };
   renderHistory();
   /* Restauration après fermeture/rechargement : rien n'est perdu par accident */
-  loadState(); updateModeUI(); updateCamModeUI(); renderHistory();
+  loadState(); updateModeUI(); renderHistory();
   if (lastResult) {
     valEl.textContent = lastResult;
     editVal.value = lastResult;
@@ -354,12 +308,12 @@ type: "text/html"
     return { text: r.getText(), format: fmtName(r.getBarcodeFormat()) };
   }
   /* Décode une image/video dessinée dans un canvas — API 0.21 : MultiFormatReader + LuminanceSource */
-  function zxDecodeElement(el, maxSide) {
+  function zxDecodeElement(el) {
     if (!window.ZXing || !getReader()) return null;
     var w = el.videoWidth || el.naturalWidth || el.width;
     var h = el.videoHeight || el.naturalHeight || el.height;
     if (!w || !h) return null;
-    var scale = Math.min(1, (maxSide || 1200) / Math.max(w, h));
+    var scale = Math.min(1, 1200 / Math.max(w, h));
     var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
     var c = getZxCanvas(); c.width = cw; c.height = ch;
     var ctx = c.getContext('2d', { willReadFrequently: true });
@@ -370,16 +324,6 @@ type: "text/html"
     return null;
   }
 
-  /* Décode une photo en testant plusieurs résolutions (v10) */
-  function zxDecodePhoto(img) {
-    var sizes = [1400, 1000, 700];
-    for (var i = 0; i < sizes.length; i++) {
-      var r = zxDecodeElement(img, sizes[i]);
-      if (r) return r;
-    }
-    return null;
-  }
-
   function stopScan() {
     running = false;
     if (rafId) cancelAnimationFrame(rafId);
@@ -387,247 +331,18 @@ type: "text/html"
     if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
     video.srcObject = null;
     startBtn.textContent = '▶︎ Démarrer la caméra';
-    if (camTools) camTools.style.display = 'none';
-    if (shutterBtn) shutterBtn.style.display = 'none';
-    shotActive = false;
-    /* Si l'utilisateur veut toujours la lampe (interrupteur ON), on la relance sur le flux caché
-       — avec un petit délai, annulable si un nouveau scan démarre aussitôt. */
-    if (torchRelaunchTimer) { clearTimeout(torchRelaunchTimer); torchRelaunchTimer = null; }
-    if (torchWanted && !document.hidden) {
-      torchRelaunchTimer = setTimeout(function () {
-        torchRelaunchTimer = null;
-        if (torchWanted && !running) torchToggle(true);
-      }, 400);
-    }
   }
 
-  /* ================= CHOIX DE LA CAMÉRA, LAMPE, ZOOM, PHOTO (v8-v10) ================= */
-  var camSelect = document.getElementById('camSelect');
-  var torchBtn = document.getElementById('torchBtn');
-  var zoomRange = document.getElementById('zoomRange');
-  var camTools = document.getElementById('camTools');
-  var shutterBtn = document.getElementById('shutterBtn');
-  var torchOn = false;
-  var shotActive = false;
-
-  /* ===== LAMPE TORCHE GÉNÉRALE (v11) : interrupteur ON/OFF sur la page d'accueil =====
-     Fonctionne même sans scan en cours, grâce à un flux caméra caché. */
-  var torchSwitch = document.getElementById('torchSwitch');
-  var torchLabel = document.getElementById('torchLabel');
-  var torchWanted = false;   /* l'utilisateur veut la lampe allumée */
-  var torchStream = null;    /* flux caméra caché utilisé pour la lampe hors scan */
-  var torchRelaunchTimer = null;
-  var torchVideo = document.createElement('video');
-  torchVideo.setAttribute('playsinline', '');
-  torchVideo.muted = true;
-  torchVideo.style.display = 'none';
-  document.body.appendChild(torchVideo);
-
-  function stopTorchStream() {
-    if (torchStream) {
-      torchStream.getTracks().forEach(function (t) { t.stop(); });
-      torchStream = null;
-      torchVideo.srcObject = null;
-    }
-  }
-  function setTorchUI(on, na) {
-    torchWanted = on;
-    torchSwitch.checked = on;
-    if (na) torchSwitch.classList.add('na'); else torchSwitch.classList.remove('na');
-    torchLabel.textContent = na ? 'indispo.' : (on ? 'ON' : 'OFF');
-  }
-  function syncTorchBtn() {
-    if (torchBtn.disabled) return;
-    torchBtn.classList.toggle('on', torchOn);
-    torchBtn.classList.toggle('off', !torchOn);
-    torchBtn.textContent = torchOn ? '💡 Lampe : allumée' : '💡 Lampe : éteinte';
-  }
-  async function torchToggle(on) {
-    torchWanted = on; /* CORRECTIF v12 : l'état voulu est mémorisé immédiatement (bug lampe de la v11) */
-    var track = (running && stream && stream.getVideoTracks().length > 0)
-      ? stream.getVideoTracks()[0] : null;
-    if (!on) {
-      if (track && torchOn) track.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {});
-      torchOn = false;
-      setTorchUI(false, false);
-      syncTorchBtn();
-      if (!running) stopTorchStream();
-      return;
-    }
-    try {
-      if (!track) {
-        /* Pas de scan en cours : ouverture d'un flux caméra caché juste pour la lampe */
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('pas de caméra');
-        if (!torchStream) {
-          torchStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } }, audio: false
-          });
-          /* Un scan a été relancé entre-temps ou la lampe a été coupée : on abandonne proprement */
-          if (running || !torchWanted) { stopTorchStream(); return; }
-          torchVideo.srcObject = torchStream;
-          await torchVideo.play().catch(function () {});
-        }
-        if (!torchStream.getVideoTracks().length) throw new Error('pas de caméra');
-        track = torchStream.getVideoTracks()[0];
-      }
-      await track.applyConstraints({ advanced: [{ torch: true }] });
-      torchOn = true;
-      setTorchUI(true, false);
-      syncTorchBtn();
-    } catch (e) {
-      torchOn = false;
-      setTorchUI(false, true);
-      syncTorchBtn();
-      stopTorchStream();
-      statusEl.className = 'hint';
-      statusEl.textContent = '💡 Lampe torche non disponible sur cet appareil ou ce navigateur (essayez Chrome ou Opera sur smartphone).';
-    }
-  }
-  torchSwitch.addEventListener('change', function () { torchToggle(torchSwitch.checked); });
-
-  /* Éteint la lampe automatiquement (après lecture d'un code / régénération réussie) */
-  function torchAutoOff() {
-    if (!torchOn && !torchWanted) return;
-    var track = (running && stream && stream.getVideoTracks().length > 0)
-      ? stream.getVideoTracks()[0]
-      : (torchStream && torchStream.getVideoTracks().length > 0 ? torchStream.getVideoTracks()[0] : null);
-    if (track) track.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {});
-    torchOn = false;
-    setTorchUI(false, false);
-    syncTorchBtn();
-    if (!running) stopTorchStream();
-  }
-
-  /* Capture la frame caméra → photo → enregistrement + analyse (v10) */
-  function captureShot() {
-    if (!running || !video.videoWidth) return;
-    var c = document.createElement('canvas');
-    c.width = video.videoWidth; c.height = video.videoHeight;
-    c.getContext('2d').drawImage(video, 0, 0);
-    c.toBlob(function (blob) {
-      var f = new File([blob], photoName(blob), { type: blob.type || 'image/jpeg' });
-      stopScan();
-      if (torchRelaunchTimer) { clearTimeout(torchRelaunchTimer); torchRelaunchTimer = null; }
-      torchOffPhysical(); /* photo prise : la lampe s'éteint tout de suite, l'interrupteur est conservé */
-      handlePhotoFile(f, true);
-    }, 'image/jpeg', 0.92);
-  }
-
-  /* Éteint physiquement la LED et libère le flux caché, SANS toucher à l'interrupteur */
-  function torchOffPhysical() {
-    var track = (torchStream && torchStream.getVideoTracks().length > 0) ? torchStream.getVideoTracks()[0]
-      : ((running && stream && stream.getVideoTracks().length > 0) ? stream.getVideoTracks()[0] : null);
-    if (track && torchOn) track.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {});
-    torchOn = false;
-    syncTorchBtn();
-    stopTorchStream();
-  }
-  /* Fermeture de l'application → éteint caméra et lampe, interrupteur remis sur OFF */
-  function setTorchOffNow() {
-    if (torchRelaunchTimer) { clearTimeout(torchRelaunchTimer); torchRelaunchTimer = null; }
-    torchOffPhysical();
-    torchWanted = false;
-    torchSwitch.checked = false;
-    torchSwitch.classList.remove('na');
-    torchLabel.textContent = 'OFF';
-  }
-  window.addEventListener('pagehide', function () { torchWanted = false; if (running) stopScan(); setTorchOffNow(); });
-  /* Changement d'appli (ex. ouverture de l'appli Appareil photo) : le téléphone reprend la LED,
-     on éteint physiquement mais ON MÉMORISE l'interrupteur et on RALLUME dès le retour dans l'app. */
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) {
-      if (running) stopScan();
-      torchOffPhysical();
-    } else if (torchWanted && !running) {
-      torchToggle(true);
-    }
-  });
-
-  function refreshCamList() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
-    navigator.mediaDevices.enumerateDevices().then(function (devs) {
-      var cams = devs.filter(function (d) { return d.kind === 'videoinput'; });
-      if (cams.length === 0) return;
-      var saved = null;
-      try { saved = localStorage.getItem('scanregen_cam') || null; } catch (e) {}
-      camSelect.innerHTML = '';
-      var optAuto = document.createElement('option');
-      optAuto.value = '';
-      optAuto.textContent = '📷 Caméra : automatique (arrière si possible)';
-      camSelect.appendChild(optAuto);
-      cams.forEach(function (d, i) {
-        var o = document.createElement('option');
-        o.value = d.deviceId;
-        o.textContent = '📷 ' + (d.label ? d.label.replace(/\s*\(camera.*$/i, '') : ('Caméra ' + (i + 1)));
-        camSelect.appendChild(o);
-      });
-      camSelect.value = (saved && cams.some(function (d) { return d.deviceId === saved; })) ? saved : '';
-      camSelect.style.display = cams.length > 1 ? 'block' : 'none';
-    }).catch(function () {});
-  }
-
-  camSelect.addEventListener('change', function () {
-    try {
-      if (camSelect.value) localStorage.setItem('scanregen_cam', camSelect.value);
-      else localStorage.removeItem('scanregen_cam');
-    } catch (e) {}
-    if (running) { stopScan(); startScan(); }
-  });
-
-  function setupCamTools() {
-    if (!stream || !stream.getVideoTracks || stream.getVideoTracks().length === 0) return;
-    var track = stream.getVideoTracks()[0];
-    var caps = track.getCapabilities ? track.getCapabilities() : {};
-    var hasTorch = !!caps.torch;
-    var hasZoom = !!(caps.zoom && caps.zoom.max > caps.zoom.min);
-    if (hasTorch) {
-      torchOn = false;
-      torchBtn.disabled = false;
-      torchBtn.classList.remove('on', 'na');
-      torchBtn.classList.add('off');
-      torchBtn.textContent = '💡 Lampe : éteinte';
-      torchBtn.onclick = function () { torchToggle(!torchOn); };
-    } else {
-      torchBtn.disabled = true;
-      torchBtn.classList.remove('on', 'off');
-      torchBtn.classList.add('na');
-      torchBtn.textContent = '💡 Lampe indisponible';
-      torchBtn.onclick = null;
-    }
-    if (hasZoom) {
-      zoomRange.style.display = '';
-      zoomRange.min = caps.zoom.min;
-      zoomRange.max = caps.zoom.max;
-      zoomRange.step = (caps.zoom.step && caps.zoom.step > 0) ? caps.zoom.step : 0.1;
-      try { zoomRange.value = (track.getSettings().zoom || caps.zoom.min); } catch (e) { zoomRange.value = caps.zoom.min; }
-      zoomRange.oninput = function () {
-        track.applyConstraints({ advanced: [{ zoom: parseFloat(zoomRange.value) }] }).catch(function () {});
-      };
-    } else {
-      zoomRange.style.display = 'none';
-      zoomRange.oninput = null;
-    }
-    camTools.style.display = 'flex';
-  }
-
-  async function startScan(shot) {
+  async function startScan() {
     if (running) { stopScan(); return; }
-    shotActive = !!shot;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      statusEl.textContent = 'Caméra indisponible ici : utilisez « Scanner une photo enregistrée » ou hébergez la page en HTTPS.';
+      statusEl.textContent = 'Caméra indisponible ici : utilisez « Scanner depuis une photo » ou hébergez la page en HTTPS.';
       statusEl.className = 'hint err';
       return;
     }
     try {
-      if (torchRelaunchTimer) { clearTimeout(torchRelaunchTimer); torchRelaunchTimer = null; }
-      stopTorchStream(); /* libère la caméra cachée de la lampe avant d'ouvrir le flux de scan */
-      var camId = null;
-      try { camId = localStorage.getItem('scanregen_cam') || null; } catch (e) {}
-      var vcons = { width: { ideal: 1920 }, height: { ideal: 1080 } };
-      if (camId) vcons.deviceId = { exact: camId };
-      else vcons.facingMode = { ideal: 'environment' };
       stream = await navigator.mediaDevices.getUserMedia({
-        video: vcons,
+        video: { facingMode: { ideal: 'environment' } },
         audio: false
       });
       video.srcObject = stream;
@@ -636,24 +351,16 @@ type: "text/html"
       startBtn.textContent = '⏸ Arrêter la caméra';
       statusEl.className = 'hint';
       statusEl.textContent = 'Visez le code-barres, la détection est automatique.';
-      setupCamTools();
-      refreshCamList();
-      if (torchWanted) torchToggle(true); /* la lampe suivait l'interrupteur : elle suit maintenant le flux de scan */
-      if (shotActive) {
-        shutterBtn.style.display = 'block';
-        statusEl.textContent = 'Visez le code, réglez la lampe 💡 et le zoom 🔍, puis appuyez sur « 📸 Prendre la photo ».';
-      } else {
-        var bd = getDetector();
-        if (bd) tick();
-        else if (window.ZXing) zxTick();
-        else {
-          statusEl.textContent = 'Moteur de lecture non chargé. Rechargez la page avec Internet, ou utilisez « Scanner une photo enregistrée ».';
-          statusEl.className = 'hint err';
-          stopScan();
-        }
+      var bd = getDetector();
+      if (bd) tick();
+      else if (window.ZXing) zxTick();
+      else {
+        statusEl.textContent = 'Moteur de lecture non chargé. Rechargez la page avec Internet, ou utilisez « Scanner depuis une photo ».';
+        statusEl.className = 'hint err';
+        stopScan();
       }
     } catch (e) {
-      statusEl.textContent = 'Accès caméra refusé ou indisponible : ' + (e && e.message ? e.message : e) + ' — utilisez « Scanner une photo enregistrée ».';
+      statusEl.textContent = 'Accès caméra refusé ou indisponible : ' + (e && e.message ? e.message : e) + ' — utilisez « Scanner depuis une photo ».';
       statusEl.className = 'hint err';
     }
   }
@@ -689,7 +396,6 @@ type: "text/html"
     }
     saveHistory(value, format);
     openResult(value, format);
-    torchAutoOff();
   }
 
   /* ================= RÉSULTAT / AFFICHAGE ================= */
@@ -1132,80 +838,9 @@ type: "text/html"
   /* ================= ÉVÉNEMENTS ================= */
   startBtn.addEventListener('click', startScan);
   photoBtn.addEventListener('click', function () { photoInput.value = ''; photoInput.click(); });
-  var shotBtn = document.getElementById('shotBtn');
-  var appShotInput = document.getElementById('appShotInput');
-  /* Touche unique « Prendre une photo à enregistrer » : le curseur décide Appareil photo ou Caméra */
-  shotBtn.addEventListener('click', function () {
-    if (shotMode === 'app') {
-      appShotInput.value = '';
-      appShotInput.click();
-    } else {
-      if (running) stopScan();
-      startScan(true);
-    }
-  });
-  /* Photo prise avec l'appli Appareil photo du téléphone : enregistrée puis analysée */
-  appShotInput.addEventListener('change', function () {
-    handlePhotoFile(appShotInput.files && appShotInput.files[0], true);
-  });
-  shutterBtn.addEventListener('click', captureShot);
-
-  /* ===== ENREGISTREMENT DES PHOTOS (v9) ===== */
-  var savePhotoBtn = document.getElementById('savePhotoBtn');
-  var saveStatusEl = document.getElementById('saveStatus');
-  var lastPhoto = null;
-
-  function photoName(f) {
-    var d = new Date();
-    var p = function (n) { return (n < 10 ? '0' : '') + n; };
-    var ext = (f.type === 'image/png') ? '.png' : ((f.type === 'image/webp') ? '.webp' : '.jpg');
-    return 'photo-scan-regen-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + ext;
-  }
-
-  function showSaveMsg(msg) {
-    saveStatusEl.style.display = msg ? 'block' : 'none';
-    saveStatusEl.textContent = msg || '';
-    saveStatusEl.className = 'hint';
-  }
-
-  function downloadBlob(blob, fname) {
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fname;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () { a.remove(); URL.revokeObjectURL(a.href); }, 5000);
-    return '💾 Photo enregistrée dans le dossier « Téléchargements » de l\u2019appareil.';
-  }
-
-  async function savePhotoToDevice(f) {
+  photoInput.addEventListener('change', function () {
+    var f = photoInput.files && photoInput.files[0];
     if (!f) return;
-    var fname = photoName(f);
-    if (window.showSaveFilePicker) {
-      try {
-        var types = {};
-        if (f.type) types[f.type] = (f.type === 'image/png') ? ['.png'] : ['.jpg', '.jpeg'];
-        var handle = await window.showSaveFilePicker({ suggestedName: fname, types: [{ description: 'Photo', accept: types }] });
-        var w = await handle.createWritable();
-        await w.write(f);
-        await w.close();
-        showSaveMsg('💾 Photo enregistrée' + (handle && handle.name ? ' : ' + handle.name : ' dans le dossier que vous avez choisi.'));
-        return;
-      } catch (e) {
-        if (e && e.name === 'AbortError') { showSaveMsg('❌ Enregistrement annulé.'); return; }
-      }
-    }
-    showSaveMsg(downloadBlob(f, fname));
-  }
-
-  savePhotoBtn.addEventListener('click', function () { if (lastPhoto) savePhotoToDevice(lastPhoto); });
-
-  function handlePhotoFile(f, fromShot) {
-    if (!f) return;
-    lastPhoto = f;
-    savePhotoBtn.style.display = 'block';
-    showSaveMsg('');
-    if (fromShot) savePhotoToDevice(f);
     statusEl.className = 'hint';
     statusEl.textContent = 'Analyse de la photo…';
     var url = URL.createObjectURL(f);
@@ -1227,9 +862,9 @@ type: "text/html"
           } else finish(false, 'Aucun code détecté sur cette photo. Rapprochez-vous, assurez-vous que le code est net et bien éclairé.');
         }).catch(function () { finish(false, 'Analyse impossible. Réessayez.'); });
       } else if (window.ZXing) {
-        var r = zxDecodePhoto(img);
+        var r = zxDecodeElement(img);
         if (r) { finish(true, 'Code trouvé ✓'); onDetected(r.text, r.format); }
-        else finish(false, 'Aucun code détecté sur cette photo. Refaites-la avec « 📷 Prendre une photo » en zoomant 🔍 sur le code, ou rapprochez-vous pour qu\u2019il soit net et bien éclairé.');
+        else finish(false, 'Aucun code détecté sur cette photo. Rapprochez-vous, assurez-vous que le code est net et bien éclairé.');
       } else {
         finish(false, 'Moteur de lecture non chargé. Rechargez la page avec Internet.');
       }
@@ -1240,8 +875,7 @@ type: "text/html"
       statusEl.textContent = 'Impossible de lire cette image.';
     };
     img.src = url;
-  }
-  photoInput.addEventListener('change', function () { handlePhotoFile(photoInput.files && photoInput.files[0], false); });
+  });
 
   tabQr.addEventListener('click', function () { mode = 'qr'; tabQr.classList.add('active'); tabBc.classList.remove('active'); renderOutput(); saveState(); });
   tabBc.addEventListener('click', function () { mode = 'bc'; tabBc.classList.add('active'); tabQr.classList.remove('active'); renderOutput(); saveState(); });
