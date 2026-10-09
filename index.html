@@ -26,8 +26,9 @@
   .swLbl { font-size:.9rem; color:#94a3b8; }
   #lblPhoto.actif { color:#4ade80; font-weight:700; }
   #lblVollee.actif { color:#f87171; font-weight:700; }
-  #lblFlashOn.actif { color:#4ade80; font-weight:700; }
-  #lblFlashOff.actif { color:#f87171; font-weight:700; }
+  .flashBtn.on { background:#16a34a; }   /* vert = flash allumé */
+  .flashBtn.off { background:#dc2626; }  /* rouge = flash éteint */
+  .flashBtn.auto { background:#ea580c; } /* orange = flash auto */
   .switch { position:relative; display:inline-block; width:54px; height:28px; flex:none; }
   .switch input { opacity:0; width:0; height:0; }
   .slider { position:absolute; cursor:pointer; inset:0; background:#dc2626; border-radius:28px; transition:.2s; }
@@ -78,11 +79,7 @@
       <label class="switch"><input type="checkbox" id="modeSwitch" checked /><span class="slider"></span></label>
       <span class="swLbl" id="lblVollee">⚡ Scan à la volée</span>
     </div>
-    <div class="switchRow" id="flashRow" style="display:none">
-      <span class="swLbl" id="lblFlashOn">💡 Lampe flash ON</span>
-      <label class="switch"><input type="checkbox" id="flashSwitch" /><span class="slider"></span></label>
-      <span class="swLbl" id="lblFlashOff">Lampe flash OFF</span>
-    </div>
+    <button class="sec flashBtn auto" id="flashBtn" style="display:none;margin-top:10px">🔦 Flash : auto</button>
     <div id="flashHint" class="hint" style="display:none"></div>
     <button class="sec" id="photoBtn">🖼️ Scanner depuis une photo</button>
     <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" />
@@ -171,14 +168,14 @@
   var lblVollee = document.getElementById('lblVollee');
   var scanMode = 'photo'; /* 'photo' = arrêt auto après capture (PAR DÉFAUT) | 'vollee' = scan continu */
   var LS_KEY = 'scanregen_state_v1';
-  var torchOn = false, torchSupported = false; /* lampe flash : allumée ? + disponible ? */
+  var torchOn = false, torchMode = 'auto', torchSupported = false; /* lampe flash : allumée ? + mode choisi (on/off/auto) + disponible ? */
 
   /* ===== SAUVEGARDE LOCALE (sur l'appareil uniquement) ===== */
   function saveState() {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({
         lastResult: lastResult, mode: mode, bc: bcFormat.value,
-        hist: hist.slice(0, 30), scanMode: scanMode, torch: (torchOn ? 'on' : 'off')
+        hist: hist.slice(0, 30), scanMode: scanMode, torch: torchMode
       }));
     } catch (e) {}
   }
@@ -187,6 +184,7 @@
       var s = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
       if (!s) return;
       if (s.scanMode === 'photo' || s.scanMode === 'vollee') scanMode = s.scanMode;
+      if (s.torch === 'on' || s.torch === 'off' || s.torch === 'auto') torchMode = s.torch;
       if (s.torch === 'on') torchOn = true;
       if (Array.isArray(s.hist)) hist = s.hist;
       if (s.bc) for (var i = 0; i < bcFormat.options.length; i++)
@@ -367,12 +365,13 @@
   }
 
 
-  /* ===== LAMPE FLASH — CURSEUR ON/OFF ===== */
-  var flashRow = document.getElementById('flashRow');
-  var flashSwitch = document.getElementById('flashSwitch');
+  /* ===== LAMPE FLASH — BOUTON 3 ÉTATS (vert = allumé / rouge = éteint / orange = auto) ===== */
+  var flashBtn = document.getElementById('flashBtn');
   var flashHint = document.getElementById('flashHint');
-  var lblFlashOn = document.getElementById('lblFlashOn');
-  var lblFlashOff = document.getElementById('lblFlashOff');
+  var lumCanvas = document.createElement('canvas'); /* mini-image 32×24 pour mesurer la lumière (mode auto) */
+  lumCanvas.width = 32; lumCanvas.height = 24;
+  var lumCtx = lumCanvas.getContext('2d');
+  var torchAutoTick = null; /* minuteur du mode auto (1 mesure par seconde) */
 
   function setTorch(on) {
     var track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
@@ -381,26 +380,51 @@
       .then(function () { torchOn = !!on; updateFlashUI(); })
       .catch(function () {});
   }
+  function isDark() { /* renvoie vrai s'il fait sombre devant la caméra */
+    try {
+      lumCtx.drawImage(video, 0, 0, 32, 24);
+      var d = lumCtx.getImageData(0, 0, 32, 24).data;
+      var sum = 0, n = d.length / 4;
+      for (var i = 0; i < d.length; i += 4) sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      return (sum / n) < 60;
+    } catch (e) { return false; }
+  }
+  function stopAutoTick() { if (torchAutoTick) { clearInterval(torchAutoTick); torchAutoTick = null; } }
+  function startAutoTick() {
+    stopAutoTick();
+    if (torchMode === 'auto' && running && torchSupported) {
+      setTorch(isDark()); /* mesure immédiate puis 1 fois par seconde */
+      torchAutoTick = setInterval(function () { setTorch(isDark()); }, 1000);
+    }
+  }
   function updateFlashUI() {
-    if (!running) { flashRow.style.display = 'none'; flashHint.style.display = 'none'; return; }
-    flashRow.style.display = '';
+    if (!running) { flashBtn.style.display = 'none'; flashHint.style.display = 'none'; stopAutoTick(); return; }
+    flashBtn.style.display = '';
     if (!torchSupported) {
-      flashSwitch.disabled = true;
-      flashSwitch.checked = false;
-      lblFlashOn.className = 'swLbl';
-      lblFlashOff.className = 'swLbl';
+      flashBtn.disabled = true;
+      flashBtn.className = 'sec flashBtn';
+      flashBtn.textContent = '🔦 Flash indisponible';
       flashHint.style.display = '';
       flashHint.textContent = '💡 La lampe n’est pas disponible sur ce navigateur (essayez avec Chrome).';
     } else {
-      flashSwitch.disabled = false;
+      flashBtn.disabled = false;
       flashHint.style.display = 'none';
-      flashSwitch.checked = torchOn;
-      lblFlashOn.className = 'swLbl' + (torchOn ? ' actif' : '');
-      lblFlashOff.className = 'swLbl' + (!torchOn ? ' actif' : '');
+      if (torchMode === 'on') { flashBtn.className = 'sec flashBtn on'; flashBtn.textContent = '🔦 Flash : allumé'; }
+      else if (torchMode === 'off') { flashBtn.className = 'sec flashBtn off'; flashBtn.textContent = '🔦 Flash : éteint'; }
+      else { flashBtn.className = 'sec flashBtn auto'; flashBtn.textContent = '🔦 Flash : auto (lampe ' + (torchOn ? 'ON' : 'OFF') + ')'; }
     }
   }
-  flashSwitch.addEventListener('change', function () {
-    setTorch(flashSwitch.checked).then(function () { saveState(); });
+  flashBtn.addEventListener('click', function () {
+    if (!running || !torchSupported) return;
+    /* un appui = état suivant : allumé → éteint → auto → allumé … */
+    if (torchMode === 'on') torchMode = 'off';
+    else if (torchMode === 'off') torchMode = 'auto';
+    else torchMode = 'on';
+    if (torchMode === 'on') { stopAutoTick(); setTorch(true); }
+    else if (torchMode === 'off') { stopAutoTick(); setTorch(false); }
+    else startAutoTick();
+    updateFlashUI();
+    saveState();
   });
 
   async function startScan() {
@@ -422,13 +446,14 @@
       statusEl.className = 'hint';
       statusEl.textContent = 'Visez le code-barres, la détection est automatique.';
       autoFocusZoom(); /* mise au point + zoom automatiques dès l'ouverture */
-      /* ===== FLASH V16 : détection du support lampe + démarrage du mode auto ===== */
+      /* ===== FLASH : détection du support lampe + remise dans l'état mémorisé ===== */
       try {
         var tTrack = stream.getVideoTracks()[0];
         var tCaps = tTrack.getCapabilities ? tTrack.getCapabilities() : {};
         torchSupported = !!(tCaps.torch);
       } catch (e) { torchSupported = false; }
-      if (torchSupported && torchOn) setTorch(true);
+      if (torchSupported && torchMode === 'on') setTorch(true);
+      else if (torchSupported && torchMode === 'auto') startAutoTick();
       updateFlashUI();
       var bd = getDetector();
       if (bd) tick();
